@@ -2,7 +2,6 @@
 
 A mobile-friendly web interface for switching between Proxmox VMs with one tap. Perfect for homelab setups where you want to easily switch between gaming and AI/creative workloads.
 
-![VM Controller Interface](https://via.placeholder.com/400x600/667eea/ffffff?text=VM+Controller+Interface)
 
 ## 🚀 Features
 

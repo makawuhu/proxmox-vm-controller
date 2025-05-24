@@ -2,16 +2,16 @@
 
 A mobile-friendly web interface for switching between Proxmox VMs with one tap. Perfect for homelab setups where you want to easily switch between gaming and AI/creative workloads.
 
-
 ## 🚀 Features
 
-- 📱 **Mobile-optimized interface** - Works great as a bookmarked "app" on your phone
+- 📱 **Progressive Web App (PWA)** - Install as a native app on iPhone/Android
 - 🔄 **One-click VM switching** - Stop one VM and start another with a single tap
 - 📊 **Real-time VM status** - See which VMs are running/stopped
 - 🔄 **Auto-refresh** - Status updates every 30 seconds
 - 🔐 **API key authentication** - Secure access to VM controls
 - 🐳 **LXC containerized** - Clean deployment without affecting Proxmox host
 - 🔧 **SSH-based control** - Secure communication with Proxmox
+- 🌐 **VPN-friendly** - Works great with Twingate, Tailscale, etc.
 
 ## 🎯 Use Cases
 
@@ -135,6 +135,10 @@ source venv/bin/activate
 python app.py
 ```
 
+### 7. Install as PWA
+
+Once running, open the web interface on your phone and "Add to Home Screen" for the full app experience!
+
 ## 🔧 Systemd Service (Optional)
 
 To run as a system service:
@@ -177,12 +181,36 @@ systemctl start vm-controller
 
 ## 📱 Usage
 
-1. **Access the web interface** at `http://container-ip:5000`
-2. **Enter your API key** in the web interface
-3. **Bookmark on your phone** for easy access
-4. **Tap buttons to switch VMs:**
+### Install as PWA (Recommended)
+
+**On iPhone/iPad:**
+1. Open Safari and navigate to `http://container-ip:5000`
+2. Tap the Share button 📤
+3. Tap "Add to Home Screen"
+4. Customize the app name and icon
+5. Tap "Add"
+
+**On Android:**
+1. Open Chrome and navigate to `http://container-ip:5000`
+2. Tap the menu (⋮) and select "Add to Home screen"
+3. Confirm the installation
+
+### Basic Usage
+
+1. **Enter your API key** in the web interface
+2. **View real-time VM status** - See which VMs are running
+3. **Tap buttons to switch VMs:**
    - 🎮 "Switch to Gaming" - Stops AI VM, starts Gaming VM
    - 🤖 "Switch to AI/Creative" - Stops Gaming VM, starts AI VM
+4. **Status updates automatically** every 30 seconds
+
+### Remote Access
+
+Works great with VPN solutions like:
+- **Twingate** - Zero-trust network access
+- **Tailscale** - Mesh VPN for secure remote access
+- **WireGuard** - Self-hosted VPN
+- **OpenVPN** - Traditional VPN setup
 
 ## 🔒 Security Notes
 
@@ -229,7 +257,7 @@ curl -X POST http://localhost:5000/api/switch \
 
 ## 📄 License
 
- Apache License - see LICENSE file for details
+MIT License - see LICENSE file for details
 
 ## 🙏 Acknowledgments
 

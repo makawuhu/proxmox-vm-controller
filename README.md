@@ -230,7 +230,7 @@ curl -X POST http://localhost:5000/api/switch \
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+ Apache License - see LICENSE file for details
 
 ## 🙏 Acknowledgments
 

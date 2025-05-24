@@ -89,6 +89,35 @@ def index():
     """Main web interface"""
     return render_template('index.html', vms=VM_CONFIG)
 
+@app.route('/manifest.json')
+def manifest():
+    """PWA manifest file"""
+    return {
+        "name": "VM Controller",
+        "short_name": "VM Controller", 
+        "description": "Control Proxmox VMs from your phone",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#667eea",
+        "theme_color": "#667eea",
+        "orientation": "portrait",
+        "scope": "/",
+        "icons": [
+            {
+                "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23667eea'/><text x='50' y='60' text-anchor='middle' fill='white' font-size='40' font-family='Arial'>🖥️</text></svg>",
+                "sizes": "192x192",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            },
+            {
+                "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23667eea'/><text x='50' y='60' text-anchor='middle' fill='white' font-size='60' font-family='Arial'>🖥️</text></svg>",
+                "sizes": "512x512", 
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            }
+        ]
+    }
+
 @app.route('/api/status')
 def api_status():
     """Get status of all VMs"""

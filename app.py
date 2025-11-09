@@ -4,41 +4,75 @@ Proxmox VM Controller
 Mobile-friendly web interface for switching between Proxmox VMs
 """
 
-from flask import Flask, render_template, jsonify, request
+import os
+import json
 import subprocess
 import time
+import secrets
+from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
 
-# Configuration - Update these for your setup
-PROXMOX_HOST = "192.168.4.10"
-PROXMOX_USER = "root"
-SSH_KEY_PATH = "/home/vmcontroller/.ssh/id_rsa"
-API_KEY = "your-secret-api-key-here"
+# --- Configuration ---
+CONFIG_FILE = "config.json"
+config = {}
 
-VM_CONFIG = {
-    "gaming": {
-        "id": 100,  # win11enterprise - Windows gaming VM
-        "name": "Gaming VM (Windows 11)",
-        "description": "Windows 11 Enterprise gaming VM"
-    },
-    "ai": {
-        "id": 108,  # openwebui - AI/Creative VM
-        "name": "AI/Creative VM (OpenWebUI)",
-        "description": "VM for AI and Stable Diffusion"
-    }
-}
+def first_run_setup():
+    """Prompt user for configuration and save to file."""
+    print("--- First Time Setup ---")
+    
+    config_data = {}
+    config_data["PROXMOX_HOST"] = input("Enter Proxmox Host IP: ")
+    config_data["PROXMOX_USER"] = input("Enter Proxmox SSH User (e.g., root): ")
+    config_data["SSH_KEY_PATH"] = input("Enter path to SSH private key (e.g., /home/user/.ssh/id_rsa): ")
+    config_data["API_KEY"] = secrets.token_hex(16)
+    print(f"Generated API Key: {config_data['API_KEY']}")
+    
+    config_data["VM_CONFIG"] = {}
+    while True:
+        add_vm = input("Add a VM? (y/n): ").lower()
+        if add_vm != 'y':
+            break
+        
+        vm_key = input("Enter a short name for the VM (e.g., 'gaming', 'ai'): ")
+        vm_id = int(input(f"Enter VM ID for '{vm_key}': "))
+        vm_name = input(f"Enter a display name for '{vm_key}': ")
+        vm_desc = input(f"Enter a description for '{vm_key}': ")
+        
+        config_data["VM_CONFIG"][vm_key] = {
+            "id": vm_id,
+            "name": vm_name,
+            "description": vm_desc
+        }
+        
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config_data, f, indent=4)
+        
+    print(f"\nConfiguration saved to {CONFIG_FILE}")
+
+def load_config():
+    """Load configuration from file."""
+    global config
+    with open(CONFIG_FILE, 'r') as f:
+        config = json.load(f)
+
+def save_config(new_config):
+    """Save configuration to file."""
+    global config
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(new_config, f, indent=4)
+    config = new_config
 
 def run_ssh_command(command):
     """Execute command on Proxmox host via SSH"""
     ssh_command = [
         "ssh", 
-        "-i", SSH_KEY_PATH,
+        "-i", config["SSH_KEY_PATH"],
         "-o", "StrictHostKeyChecking=no",
         "-o", "UserKnownHostsFile=/dev/null",
         "-o", "ConnectTimeout=10",
         "-o", "BatchMode=yes",
-        f"{PROXMOX_USER}@{PROXMOX_HOST}",
+        f"{config['PROXMOX_USER']}@{config['PROXMOX_HOST']}",
         command
     ]
     
@@ -87,7 +121,12 @@ def force_stop_vm(vm_id):
 @app.route('/')
 def index():
     """Main web interface"""
-    return render_template('index.html', vms=VM_CONFIG)
+    return render_template('index.html', vms=config.get("VM_CONFIG", {}))
+
+@app.route('/settings')
+def settings():
+    """Settings page"""
+    return render_template('settings.html')
 
 @app.route('/manifest.json')
 def manifest():
@@ -125,7 +164,7 @@ def api_status():
         return jsonify({"error": "Cannot connect to Proxmox host"}), 500
     
     status = {}
-    for vm_type, vm_info in VM_CONFIG.items():
+    for vm_type, vm_info in config.get("VM_CONFIG", {}).items():
         status[vm_type] = {
             "id": vm_info["id"],
             "name": vm_info["name"],
@@ -133,13 +172,47 @@ def api_status():
         }
     return jsonify(status)
 
+@app.route('/api/get_settings')
+def get_settings():
+    """Get current configuration"""
+    api_key = request.headers.get('X-API-Key')
+    if api_key != config.get("API_KEY"):
+        return jsonify({"error": "Invalid API key"}), 401
+    return jsonify(config)
+
+@app.route('/api/settings', methods=['POST'])
+def update_settings():
+    """Update configuration"""
+    api_key = request.headers.get('X-API-Key')
+    if api_key != config.get("API_KEY"):
+        return jsonify({"error": "Invalid API key"}), 401
+        
+    new_config_data = request.json
+    
+    # Basic validation
+    if not all(k in new_config_data for k in ["proxmox_host", "proxmox_user", "ssh_key_path", "vm_config"]):
+        return jsonify({"error": "Missing required fields"}), 400
+        
+    # Construct the new config object
+    updated_config = {
+        "PROXMOX_HOST": new_config_data["proxmox_host"],
+        "PROXMOX_USER": new_config_data["proxmox_user"],
+        "SSH_KEY_PATH": new_config_data["ssh_key_path"],
+        "API_KEY": new_config_data.get("api_key") or config.get("API_KEY"),
+        "VM_CONFIG": new_config_data["vm_config"]
+    }
+    
+    save_config(updated_config);
+    
+    return jsonify({"success": True, "message": "Settings updated successfully"})
+
 @app.route('/api/switch', methods=['POST'])
 def api_switch():
     """Switch between VMs"""
     try:
         # Check API key
         api_key = request.headers.get('X-API-Key') or request.form.get('api_key')
-        if api_key != API_KEY:
+        if api_key != config.get("API_KEY"):
             return jsonify({"error": "Invalid API key"}), 401
         
         target = request.form.get('target')
@@ -147,17 +220,18 @@ def api_switch():
         
         print(f"Switch request for: {target}")
         
-        if target not in VM_CONFIG:
+        vm_config = config.get("VM_CONFIG", {})
+        if target not in vm_config:
             return jsonify({"error": "Invalid target VM"}), 400
         
         if not test_connection():
             return jsonify({"error": "Cannot connect to Proxmox host"}), 500
         
-        target_vm = VM_CONFIG[target]
+        target_vm = vm_config[target]
         results = {"steps": [], "success": True}
         
         # Stop all other VMs
-        for vm_type, vm_info in VM_CONFIG.items():
+        for vm_type, vm_info in vm_config.items():
             if vm_type != target:
                 vm_status = get_vm_status(vm_info["id"])
                 if vm_status == "running":
@@ -204,15 +278,20 @@ def api_switch():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    if not os.path.exists(CONFIG_FILE):
+        first_run_setup()
+    
+    load_config()
+    
     # Verify SSH connection on startup
     print("Testing SSH connection to Proxmox host...")
     if test_connection():
         print("✅ Connection successful!")
     else:
         print("❌ Cannot connect to Proxmox host. Check SSH configuration.")
-        print(f"Host: {PROXMOX_HOST}")
-        print(f"User: {PROXMOX_USER}")
-        print(f"SSH Key: {SSH_KEY_PATH}")
+        print(f"Host: {config.get('PROXMOX_HOST')}")
+        print(f"User: {config.get('PROXMOX_USER')}")
+        print(f"SSH Key: {config.get('SSH_KEY_PATH')}")
     
     # Run the app
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

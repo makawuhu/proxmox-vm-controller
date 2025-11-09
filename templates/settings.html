@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VM Controller - Settings</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto mt-10">
+        <div class="bg-white p-8 rounded-lg shadow-lg">
+            <h1 class="text-2xl font-bold mb-6">VM Controller Settings</h1>
+
+            <form id="settings-form">
+                <!-- API Key for Authentication -->
+                <div class="mb-6">
+                    <label for="api-key-auth" class="block text-sm font-medium text-gray-700">API Key</label>
+                    <input type="password" id="api-key-auth" name="api_key_auth" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Enter API Key to make changes">
+                </div>
+
+                <!-- Proxmox Configuration -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label for="proxmox-host" class="block text-sm font-medium text-gray-700">Proxmox Host</label>
+                        <input type="text" id="proxmox-host" name="proxmox_host" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="proxmox-user" class="block text-sm font-medium text-gray-700">Proxmox User</label>
+                        <input type="text" id="proxmox-user" name="proxmox_user" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label for="ssh-key-path" class="block text-sm font-medium text-gray-700">SSH Key Path</label>
+                    <input type="text" id="ssh-key-path" name="ssh_key_path" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div class="mb-6">
+                    <label for="api-key" class="block text-sm font-medium text-gray-700">New API Key (optional)</label>
+                    <input type="text" id="api-key" name="api_key" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Leave blank to keep current key">
+                </div>
+
+                <!-- VM Configuration -->
+                <div id="vm-config-container">
+                    <h2 class="text-xl font-bold mb-4">VMs</h2>
+                    <!-- VM templates will be inserted here -->
+                </div>
+                <button type="button" id="add-vm-btn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add VM</button>
+
+                <div class="mt-8 flex justify-between">
+                    <a href="/" class="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">Back</a>
+                    <button type="submit" class="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Save Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const vmContainer = document.getElementById('vm-config-container');
+            const addVmBtn = document.getElementById('add-vm-btn');
+            const form = document.getElementById('settings-form');
+
+            function saveApiKey(apiKey) {
+                localStorage.setItem('vm_controller_api_key', apiKey);
+            }
+
+            function loadApiKey() {
+                const apiKey = localStorage.getItem('vm_controller_api_key');
+                if (apiKey) {
+                    document.getElementById('api-key-auth').value = apiKey;
+                    return true;
+                }
+                return false;
+            }
+
+            // Function to create a new VM form group
+            const createVmForm = (vmKey = '', vmData = {}) => {
+                const vmId = `vm-${Date.now()}`;
+                const vmDiv = document.createElement('div');
+                vmDiv.classList.add('p-4', 'border', 'rounded-md', 'mb-4', 'vm-form-group');
+                vmDiv.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">VM Key</label>
+                            <input type="text" name="${vmId}-key" value="${vmKey}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">VM ID</label>
+                            <input type="number" name="${vmId}-id" value="${vmData.id || ''}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">VM Name</label>
+                            <input type="text" name="${vmId}-name" value="${vmData.name || ''}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">VM Description</label>
+                            <input type="text" name="${vmId}-description" value="${vmData.description || ''}" class="mt-1 block w-full border--gray-300 rounded-md shadow-sm">
+                        </div>
+                    </div>
+                    <button type="button" class="remove-vm-btn mt-4 px-3 py-1 bg-red-500 text-white rounded-md text-sm">Remove</button>
+                `;
+                vmContainer.appendChild(vmDiv);
+            };
+
+            // Add new VM form
+            addVmBtn.addEventListener('click', () => createVmForm());
+
+            // Remove VM form
+            vmContainer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-vm-btn')) {
+                    e.target.parentElement.remove();
+                }
+            });
+
+            // Load current settings
+            const loadSettings = async () => {
+                const apiKey = document.getElementById('api-key-auth').value;
+                if (!apiKey) {
+                    // Don't load settings if API key is not entered
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/get_settings', {
+                        headers: {
+                            'X-API-Key': apiKey
+                        }
+                    });
+
+                    if (response.ok) {
+                        const settings = await response.json();
+                        document.getElementById('proxmox-host').value = settings.PROXMOX_HOST;
+                        document.getElementById('proxmox-user').value = settings.PROXMOX_USER;
+                        document.getElementById('ssh-key-path').value = settings.SSH_KEY_PATH;
+
+                        // Clear existing VM forms
+                        vmContainer.innerHTML = '<h2 class="text-xl font-bold mb-4">VMs</h2>';
+
+                        for (const [key, data] of Object.entries(settings.VM_CONFIG)) {
+                            createVmForm(key, data);
+                        }
+                        // Save API key on successful load
+                        saveApiKey(apiKey);
+                    } else {
+                        const error = await response.json();
+                        alert(`Error loading settings: ${error.error}`);
+                    }
+                } catch (error) {
+                    alert('An error occurred while loading settings.');
+                }
+            };
+
+            // Add event listener to API key input to load settings on input
+            document.getElementById('api-key-auth').addEventListener('input', loadSettings);
+            
+            // Handle form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const apiKeyAuth = formData.get('api_key_auth');
+                
+                const data = {
+                    proxmox_host: formData.get('proxmox_host'),
+                    proxmox_user: formData.get('proxmox_user'),
+                    ssh_key_path: formData.get('ssh_key_path'),
+                    api_key: formData.get('api_key'),
+                    vm_config: {}
+                };
+
+                // Group VM data by iterating through the vm-form-group elements
+                document.querySelectorAll('.vm-form-group').forEach(group => {
+                    const key = group.querySelector('input[name$="-key"]').value;
+                    const id = group.querySelector('input[name$="-id"]').value;
+                    const name = group.querySelector('input[name$="-name"]').value;
+                    const description = group.querySelector('input[name$="-description"]').value;
+
+                    if (key) {
+                        data.vm_config[key] = {
+                            id: parseInt(id),
+                            name: name,
+                            description: description
+                        };
+                    }
+                });
+
+                try {
+                    const response = await fetch('/api/settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': apiKeyAuth
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (response.ok) {
+                        alert('Settings saved successfully!');
+                        // If a new API key was set, save it
+                        if (data.api_key) {
+                            saveApiKey(data.api_key);
+                        }
+                    } else {
+                        const error = await response.json();
+                        alert(`Error: ${error.error}`);
+                    }
+                } catch (error) {
+                    alert('An error occurred while saving settings.');
+                }
+            });
+
+            // Initial load of API key
+            if (loadApiKey()) {
+                loadSettings();
+            }
+        });
+    </script>
+</body>
+</html>
